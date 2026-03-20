@@ -9,9 +9,60 @@ const STATE_KEY_PATH = 'sshKeyPath';
 const STATE_CONFIG_PATH = 'sshConfigPath';
 const STATE_MARKER_START = 'sshConfigMarkerStart';
 const STATE_MARKER_END = 'sshConfigMarkerEnd';
+const PRIVATE_KEY_HEADER_PATTERN = /-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----/;
 
 function normalizeBase64(input: string): string {
   return input.replace(/\s+/g, '');
+}
+
+function normalizePrivateKeyContent(input: string): string {
+  const normalized = input.replace(/\r\n/g, '\n').trim();
+  return normalized.endsWith('\n') ? normalized : `${normalized}\n`;
+}
+
+function looksLikePrivateKey(input: string): boolean {
+  return PRIVATE_KEY_HEADER_PATTERN.test(input);
+}
+
+function isStrictBase64(input: string): boolean {
+  if (input.length === 0 || input.length % 4 !== 0) {
+    return false;
+  }
+
+  return /^[A-Za-z0-9+/]+={0,2}$/.test(input);
+}
+
+function decodeKeyMaterial(input: string): string {
+  if (looksLikePrivateKey(input)) {
+    return normalizePrivateKeyContent(input);
+  }
+
+  const normalizedBase64 = normalizeBase64(input);
+  if (!isStrictBase64(normalizedBase64)) {
+    throw new Error(
+      'The key input must be a valid base64-encoded private key or a raw PEM/OpenSSH private key.'
+    );
+  }
+
+  const decodedKey = Buffer.from(normalizedBase64, 'base64');
+  if (decodedKey.length === 0) {
+    throw new Error('The provided key input could not be decoded.');
+  }
+
+  const canonicalBase64 = decodedKey.toString('base64').replace(/=+$/, '');
+  const providedBase64 = normalizedBase64.replace(/=+$/, '');
+  if (canonicalBase64 !== providedBase64) {
+    throw new Error('The provided key input is not valid base64-encoded key material.');
+  }
+
+  const decodedKeyString = normalizePrivateKeyContent(decodedKey.toString('utf8'));
+  if (!looksLikePrivateKey(decodedKeyString)) {
+    throw new Error(
+      'The decoded key does not look like a supported PEM/OpenSSH private key. Verify the secret contents.'
+    );
+  }
+
+  return decodedKeyString;
 }
 
 function formatIdentityPathForSshConfig(filePath: string): string {
@@ -74,24 +125,18 @@ async function ensureSecurePermissions(targetPath: string, mode: number): Promis
 
 async function run(): Promise<void> {
   try {
-    const keyBase64 = core.getInput('key', { required: true });
+    const keyInput = core.getInput('key', { required: true, trimWhitespace: false });
     const sshUser = assertSingleLineInput('username', core.getInput('username', { required: true }));
     const sshHost = assertSingleLineInput('host', core.getInput('host', { required: true }));
     const sshPort = validatePort(core.getInput('port') || '22');
     const sshIdentityFileName = validateIdentityFileName(core.getInput('key_file_name') || 'key.pem');
     const sshAlias = assertSingleLineInput('alias', core.getInput('alias') || 'ssh-host');
 
-    core.setSecret(keyBase64);
+    core.setSecret(keyInput);
 
-    const normalizedKeyBase64 = normalizeBase64(keyBase64);
-    const decodedKey = Buffer.from(normalizedKeyBase64, 'base64');
-
-    if (decodedKey.length === 0) {
-      throw new Error('The provided key input could not be decoded.');
-    }
-
-    const decodedKeyString = decodedKey.toString('utf8');
-    core.setSecret(decodedKeyString);
+    const privateKeyContent = decodeKeyMaterial(keyInput);
+    const privateKeyBuffer = Buffer.from(privateKeyContent, 'utf8');
+    core.setSecret(privateKeyContent);
 
     const homeDirectory = os.homedir();
     const sshDirectory = path.join(homeDirectory, '.ssh');
@@ -103,7 +148,7 @@ async function run(): Promise<void> {
     await fs.mkdir(sshDirectory, { recursive: true, mode: SSH_DIR_MODE });
     await ensureSecurePermissions(sshDirectory, SSH_DIR_MODE);
 
-    await fs.writeFile(identityFilePath, decodedKey, { mode: SSH_FILE_MODE });
+    await fs.writeFile(identityFilePath, privateKeyBuffer, { mode: SSH_FILE_MODE });
     await ensureSecurePermissions(identityFilePath, SSH_FILE_MODE);
 
     let existingConfig = '';

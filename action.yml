@@ -1,9 +1,9 @@
 name: SSH Config Setup Action
-description: Securely configure SSH access from a base64-encoded private key and clean it up after the job.
+description: Securely configure SSH access from a private key and clean it up after the job.
 
 inputs:
   key:
-    description: Base64 encoded SSH private key.
+    description: SSH private key in base64-encoded or raw PEM/OpenSSH format.
     required: true
   username:
     description: SSH username for the remote server.

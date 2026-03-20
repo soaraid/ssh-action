@@ -1,12 +1,12 @@
 # SSH Config Setup Action
 
-Securely configure SSH access in GitHub Actions from a base64-encoded private key, then remove the generated credentials during the post-job phase.
+Securely configure SSH access in GitHub Actions from a private key, then remove the generated credentials during the post-job phase.
 
 This project is a Node.js-based GitHub Action built with TypeScript for teams that want a clean SSH setup step without embedding shell-heavy setup logic into every workflow.
 
 ## Features
 
-- In-memory base64 decoding of the private key using Node.js `Buffer`
+- Supports base64-encoded and raw PEM/OpenSSH private keys without shell decoding
 - Strict file permissions for `~/.ssh`, the generated private key, and `~/.ssh/config`
 - Cross-platform path handling using `os.homedir()` and `path.join()`
 - Post-job cleanup that removes the generated private key and the managed SSH config block
@@ -17,7 +17,7 @@ This project is a Node.js-based GitHub Action built with TypeScript for teams th
 
 | Input | Description | Required | Default |
 | :-- | :-- | :--: | :-- |
-| `key` | Base64 encoded SSH private key. | Yes | - |
+| `key` | SSH private key in base64-encoded or raw PEM/OpenSSH format. | Yes | - |
 | `username` | SSH username for the remote server. | Yes | - |
 | `host` | SSH host domain or IP address. | Yes | - |
 | `port` | SSH port to connect through. | No | `22` |
@@ -66,8 +66,8 @@ rsync -avz ./dist/ production:/var/www/app/
 
 During the main phase, the action:
 
-1. Reads the base64-encoded private key from the `key` input.
-2. Decodes it in memory using Node.js.
+1. Reads the private key from the `key` input.
+2. If needed, decodes it in memory using Node.js.
 3. Creates `~/.ssh` with `0o700` permissions.
 4. Writes the private key and `~/.ssh/config` with `0o600` permissions.
 5. Appends a managed SSH config block for the requested alias.
@@ -81,6 +81,7 @@ During the post phase, the action:
 ## Security Notes
 
 - The private key is never decoded with shell commands.
+- The action accepts either raw PEM/OpenSSH key material or a base64-encoded version of that key.
 - The action uses `core.setSecret()` to mask the base64 input and decoded key material in logs.
 - The generated `~/.ssh` directory is forced to `0o700`.
 - The generated private key file and `~/.ssh/config` are forced to `0o600`.
