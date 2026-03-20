@@ -1,0 +1,31 @@
+# Dependency directories (Wajib di-ignore)
+node_modules/
+jspm_packages/
+
+# Build outputs
+# Kita TIDAK meng-ignore folder dist/ karena GitHub Action
+# butuh file di dalam dist/ untuk dijalankan oleh Runner.
+# Cukup ignore folder build atau temp lain jika ada.
+lib/
+temp/
+
+# Log files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs/
+*.log
+
+# Editor & OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# TypeScript
+# Kita tetap simpan tsconfig.json, tapi ignore file build cache jika ada
+*.tsbuildinfo
+
+# Environment variables (Jika kamu pakai .env untuk testing lokal)
+.env
+.env.local
