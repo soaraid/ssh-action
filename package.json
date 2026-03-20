@@ -1,0 +1,23 @@
+{
+  "name": "ssh-action",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Professional GitHub Action for secure SSH config setup and post-job cleanup.",
+  "license": "MIT",
+  "scripts": {
+    "clean": "node -e \"const fs=require('node:fs'); fs.rmSync('dist',{ recursive: true, force: true }); fs.rmSync('dist-post',{ recursive: true, force: true });\"",
+    "build:main": "ncc build src/main.ts -o dist",
+    "build:cleanup": "ncc build src/cleanup.ts -o dist-post && node -e \"const fs=require('node:fs'); fs.mkdirSync('dist',{ recursive: true }); fs.copyFileSync('dist-post/index.js','dist/cleanup.js'); fs.rmSync('dist-post',{ recursive: true, force: true });\"",
+    "build": "npm run clean && npm run build:main && npm run build:cleanup"
+  },
+  "dependencies": {
+    "@actions/core": "^1.11.1",
+    "@actions/exec": "^1.1.1",
+    "@actions/io": "^1.1.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.30",
+    "@vercel/ncc": "^0.38.3",
+    "typescript": "^5.8.2"
+  }
+}

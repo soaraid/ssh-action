@@ -1,0 +1,31 @@
+name: SSH Config Setup Action
+description: Securely configure SSH access from a base64-encoded private key and clean it up after the job.
+
+inputs:
+  key:
+    description: Base64 encoded SSH private key.
+    required: true
+  username:
+    description: SSH username for the remote server.
+    required: true
+  host:
+    description: SSH host domain or IP address.
+    required: true
+  port:
+    description: SSH port to connect through.
+    required: false
+    default: "22"
+  key_file_name:
+    description: Name of the generated private key file.
+    required: false
+    default: key.pem
+  alias:
+    description: Alias to use in subsequent steps.
+    required: false
+    default: ssh-host
+
+runs:
+  using: node20
+  main: dist/index.js
+  post: dist/cleanup.js
+  post-if: always()
